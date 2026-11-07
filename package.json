@@ -5,6 +5,14 @@
   "type": "module",
   "description": "小红书直播弹幕 / OBS 浏览器源弹幕层",
   "main": "src/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sky-senge/xhs-danmaku.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node src/index.js",
     "mock": "node src/index.js --mock",
@@ -13,9 +21,6 @@
     "shot:obs": "node scripts/shot-obs.mjs 800 1000",
     "shot:themes": "node scripts/shot-themes.mjs",
     "probe": "node scripts/probe-source.mjs"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "dependencies": {
     "playwright-core": "^1.65.0",
