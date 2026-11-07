@@ -1,0 +1,441 @@
+/* =============================================================
+   小红书弹幕层 · 样式
+   OBS 浏览器源要求页面背景透明，所有视觉都可配置（CSS 变量由 JS 注入）
+   ============================================================= */
+
+:root {
+  --font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-size: 26px;
+  --font-weight: 600;
+  --line-height: 1.45;
+  --color: #ffffff;
+  --nick-color: #ffd166;
+
+  --gap: 10px;
+  --max-width: 56vw;
+  --pad-top: 40px;
+  --pad-bottom: 40px;
+  --pad-side: 40px;
+
+  --radius: 14px;
+  --card-bg: rgba(18, 18, 20, 0.55);
+  --card-border: 1px solid rgba(255, 255, 255, 0.1);
+  --card-blur: 8px;
+  --card-px: 14px;
+  --card-py: 8px;
+
+  --avatar-size: 32px;
+
+  --in-dur: 240ms;
+  --out-dur: 320ms;
+  --anim-in: xhs-in-slide;
+
+  --stroke-color: rgba(0, 0, 0, 0.85);
+  --stroke-width: 0px;
+
+  --hl-color: #ffffff;
+  --hl-bg: rgba(255, 77, 109, 0.85);
+
+  --event-color: #7ee0a1;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--pad-top) var(--pad-side) var(--pad-bottom);
+  box-sizing: border-box;
+}
+
+body[data-newest="top"] .stage {
+  justify-content: flex-start;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--max-width);
+  width: fit-content;
+}
+
+body[data-align="center"] .list {
+  margin: 0 auto;
+  align-items: center;
+}
+body[data-align="right"] .list {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+/* ---------------- 单行 ---------------- */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--avatar-size) * 0.28);
+  max-width: 100%;
+  animation: var(--anim-in) var(--in-dur) cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  will-change: transform, opacity;
+}
+
+.row + .row {
+  margin-top: var(--gap);
+}
+
+/* 出场：高度 + 外边距一起收，避免列表跳动 */
+.row.is-out {
+  transition:
+    height var(--out-dur) ease,
+    margin-top var(--out-dur) ease,
+    opacity calc(var(--out-dur) * 0.8) ease,
+    transform var(--out-dur) ease !important;
+  opacity: 0;
+  transform: translateX(-12px) scale(0.98);
+  animation: none !important;
+}
+
+.avatar-wrap {
+  flex: 0 0 auto;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--avatar-size) * 0.44);
+  color: #fff;
+  text-shadow: none;
+  margin-top: calc(var(--card-py) + (var(--font-size) * var(--line-height) - var(--avatar-size)) / 2);
+}
+
+body[data-avatar="off"] .avatar-wrap {
+  display: none;
+}
+
+.avatar-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card {
+  position: relative;
+  min-width: 0;
+  padding: var(--card-py) var(--card-px);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  border: var(--card-border);
+  backdrop-filter: blur(var(--card-blur));
+  -webkit-backdrop-filter: blur(var(--card-blur));
+  color: var(--color);
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  font-weight: var(--font-weight);
+  line-height: var(--line-height);
+  overflow-wrap: anywhere;
+}
+
+body[data-card="off"] .card {
+  padding: 0;
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.nick,
+.body,
+.verb {
+  -webkit-text-stroke: var(--stroke-width) var(--stroke-color);
+  paint-order: stroke fill;
+}
+
+.nick {
+  color: var(--nick-color);
+  margin-right: 0.38em;
+}
+
+.body {
+  color: var(--color);
+  white-space: pre-wrap;
+}
+
+/* ---------------- 长弹幕换行 ---------------- */
+/*
+ * 昵称和正文拆成两栏：正文换行时第二行对齐正文开头，
+ * 不会绕回昵称下面变成一个歪掉的方块。
+ */
+body[data-wrap="on"] .row--comment .card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.38em;
+  align-items: start;
+}
+
+body[data-wrap="on"] .row--comment .nick {
+  grid-area: 1 / 1;
+  margin-right: 0;
+}
+
+body[data-wrap="on"] .row--comment .body {
+  grid-area: 1 / 2;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 3);
+  overflow: hidden;
+}
+
+/* 0 = 不限行数 */
+body[data-wrap="on"][data-lines="0"] .row--comment .body {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+/* 关掉换行 = 一行到底，超长用省略号 */
+body[data-wrap="off"] .row--comment .card {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-wrap="off"] .row--comment .nick {
+  flex: 0 0 auto;
+}
+
+body[data-wrap="off"] .row--comment .body {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body[data-shadow="on"] .nick,
+body[data-shadow="on"] .body,
+body[data-shadow="on"] .verb {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------- 事件行（进场 / 关注 / 点赞 / 礼物） ---------------- */
+
+.row--event .card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: calc(var(--font-size) * 0.92);
+  opacity: 0.96;
+}
+
+.row--event .icon {
+  width: 1.05em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.row--event .icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.row--enter .icon {
+  color: #7ee0a1;
+}
+.row--follow .icon {
+  color: #ff9ec4;
+}
+.row--like .icon {
+  color: #ff6b81;
+}
+.row--gift .icon {
+  color: #ffc857;
+}
+
+.row--event .verb {
+  color: var(--color);
+  opacity: 0.88;
+}
+
+.row--event .num {
+  color: #ffd166;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 高亮 */
+mark.hl {
+  background: var(--hl-bg);
+  color: var(--hl-color);
+  padding: 0 0.18em;
+  border-radius: 0.25em;
+  font-weight: 800;
+}
+
+/* ---------------- 主题 ---------------- */
+
+/* 极简：无卡片、纯文字（卡片开关由配置里的 card.enabled 控制） */
+body[data-theme="minimal"][data-shadow="on"] .nick,
+body[data-theme="minimal"][data-shadow="on"] .body {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+/* 胶囊：昵称后的小圆点（卡片形状由配置里的 radius 控制） */
+body[data-theme="capsule"] .nick::after {
+  content: "";
+}
+
+/* 霓虹：外发光 */
+body[data-theme="neon"] .card {
+  box-shadow:
+    0 0 14px rgba(89, 240, 255, 0.28),
+    inset 0 0 12px rgba(89, 240, 255, 0.08);
+}
+body[data-theme="neon"] .row--event .card {
+  box-shadow: 0 0 12px rgba(255, 120, 220, 0.3);
+  border-color: rgba(255, 120, 220, 0.5);
+}
+
+/* 毛玻璃：左侧竖条 + 半透明 */
+body[data-theme="glass"] .card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--nick-color);
+  opacity: 0.9;
+}
+body[data-theme="glass"] .card {
+  padding-left: calc(var(--card-px) + 6px);
+}
+
+/* ---------------- 入场动画 ---------------- */
+
+@keyframes xhs-in-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes xhs-in-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes xhs-in-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86) translateY(6px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes xhs-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+body[data-anim="fade"] {
+  --anim-in: xhs-in-fade;
+}
+body[data-anim="pop"] {
+  --anim-in: xhs-in-pop;
+}
+body[data-anim="up"] {
+  --anim-in: xhs-in-up;
+}
+body[data-anim="none"] {
+  --anim-in: none;
+}
+
+/* ---------------- 状态角标 ---------------- */
+
+.status {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+}
+.status .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffb020;
+  box-shadow: 0 0 8px currentColor;
+}
+.status[data-state="ok"] .dot {
+  background: #2ee6a8;
+}
+.status[data-state="err"] .dot {
+  background: #ff5c72;
+}
+.status[hidden] {
+  display: none;
+}

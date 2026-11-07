@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>小红书弹幕 · 控制台</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23ff2e4d'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3E小%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">小</span>
+        <div>
+          <h1>小红书弹幕 · OBS 浏览器源</h1>
+          <p>监听直播中控台弹幕，输出 H5 弹幕层</p>
+        </div>
+      </div>
+
+      <div class="state" id="stateBadge" data-state="idle"><i></i><span id="stateText">未启动</span></div>
+
+      <div class="actions">
+        <span class="saved" id="savedHint">改动自动保存</span>
+        <button class="btn primary" id="btnStart">启动采集</button>
+        <button class="btn" id="btnStop">停止</button>
+        <button class="btn ghost" id="btnRestart">重启</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="workspace">
+        <nav class="tabs" id="tabs">
+          <button class="tab active" data-tab="style">样式</button>
+          <button class="tab" data-tab="source">采集</button>
+          <button class="tab" data-tab="message">消息</button>
+          <button class="tab" data-tab="filter">过滤</button>
+          <button class="tab" data-tab="advanced">高级</button>
+          <button class="tab" data-tab="debug">调试</button>
+        </nav>
+
+        <!-- ==================== 样式 ==================== -->
+        <section class="pane active" data-pane="style">
+          <div class="card">
+            <h2>主题</h2>
+            <p class="hint">点一下就换，右侧预览和 OBS 里的画面会立刻同步。</p>
+            <div class="themes" id="themeCards">
+              <button class="theme-card" type="button" data-theme="bubble">
+                <span class="theme-mini" data-mini="bubble"><i></i><i></i><i></i></span>
+                <em>气泡卡片</em>
+              </button>
+              <button class="theme-card" type="button" data-theme="minimal">
+                <span class="theme-mini" data-mini="minimal"><i></i><i></i><i></i></span>
+                <em>极简描边</em>
+              </button>
+              <button class="theme-card" type="button" data-theme="capsule">
+                <span class="theme-mini" data-mini="capsule"><i></i><i></i><i></i></span>
+                <em>胶囊</em>
+              </button>
+              <button class="theme-card" type="button" data-theme="neon">
+                <span class="theme-mini" data-mini="neon"><i></i><i></i><i></i></span>
+                <em>霓虹</em>
+              </button>
+              <button class="theme-card" type="button" data-theme="glass">
+                <span class="theme-mini" data-mini="glass"><i></i><i></i><i></i></span>
+                <em>毛玻璃</em>
+              </button>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="hint" style="margin-bottom: 10px">一键风格（会覆盖字号 / 颜色 / 卡片等细节，之后还能继续微调）</div>
+            <div class="presets">
+              <button class="chip" type="button" data-preset="classic">弹幕姬经典</button>
+              <button class="chip" type="button" data-preset="clean">极简白字</button>
+              <button class="chip" type="button" data-preset="sales">带货醒目</button>
+              <button class="chip" type="button" data-preset="esports">电竞霓虹</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>排版</h2>
+            <div class="grid">
+              <div class="field">
+                <label>新消息位置</label>
+                <select data-path="overlay.newestAt">
+                  <option value="bottom">底部（向上滚）</option>
+                  <option value="top">顶部（向下滚）</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>水平对齐</label>
+                <select data-path="overlay.align">
+                  <option value="left">左对齐</option>
+                  <option value="center">居中</option>
+                  <option value="right">右对齐</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>最多显示条数</label>
+                <input type="number" min="1" max="40" step="1" data-path="overlay.maxItems" />
+              </div>
+              <div class="field">
+                <label>停留时长（毫秒，0 = 不消失）</label>
+                <input type="number" min="0" max="120000" step="500" data-path="overlay.ttlMs" />
+              </div>
+              <div class="field">
+                <label>行间距 px</label>
+                <input type="number" min="0" max="40" step="1" data-path="overlay.gap" />
+              </div>
+              <div class="field">
+                <label>长弹幕换行</label>
+                <select data-path="overlay.wrap">
+                  <option value="true">开启（推荐）</option>
+                  <option value="false">关闭（一行，超出省略）</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>最多显示行数（0 = 不限）</label>
+                <input type="number" min="0" max="12" step="1" data-path="overlay.maxLines" />
+              </div>
+              <div class="field">
+                <label>最大宽度（视口 %）</label>
+                <input type="number" min="20" max="100" step="1" data-path="overlay.maxWidthPct" />
+              </div>
+              <div class="field">
+                <label>上边距 px</label>
+                <input type="number" min="0" max="600" step="4" data-path="overlay.paddingTop" />
+              </div>
+              <div class="field">
+                <label>下边距 px</label>
+                <input type="number" min="0" max="600" step="4" data-path="overlay.paddingBottom" />
+              </div>
+              <div class="field">
+                <label>左右边距 px</label>
+                <input type="number" min="0" max="600" step="4" data-path="overlay.paddingSide" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>文字</h2>
+            <div class="grid">
+              <div class="field span2">
+                <label>字号 <b id="vFontSize">26</b> px</label>
+                <input type="range" min="12" max="64" step="1" data-path="overlay.fontSize" data-range="vFontSize" />
+              </div>
+              <div class="field">
+                <label>字体</label>
+                <select data-path="overlay.fontFamily">
+                  <option value='"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif'>系统默认（推荐）</option>
+                  <option value='"Microsoft YaHei","PingFang SC",sans-serif'>微软雅黑</option>
+                  <option value='"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei",sans-serif'>鸿蒙黑体</option>
+                  <option value='"Source Han Sans SC","Noto Sans SC",sans-serif'>思源黑体</option>
+                  <option value='ui-monospace,"Cascadia Code",Consolas,monospace'>等宽字体</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>字重</label>
+                <select data-path="overlay.fontWeight">
+                  <option value="400">常规</option>
+                  <option value="500">中等</option>
+                  <option value="600">半粗</option>
+                  <option value="700">加粗</option>
+                  <option value="800">特粗</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>行高</label>
+                <input type="number" min="1" max="2.4" step="0.05" data-path="overlay.lineHeight" />
+              </div>
+              <div class="field">
+                <label>正文颜色</label>
+                <input type="color" data-path="overlay.color" />
+              </div>
+              <div class="field">
+                <label>昵称颜色（取色关闭时生效）</label>
+                <input type="color" data-path="overlay.nicknameColor" />
+              </div>
+              <div class="field">
+                <label>昵称每人不同色</label>
+                <select data-path="overlay.nicknameColorize">
+                  <option value="true">开启</option>
+                  <option value="false">关闭</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="switches">
+              <label class="switch"><input type="checkbox" data-path="overlay.textStroke" /><span class="track"></span>文字描边</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.shadow" /><span class="track"></span>文字阴影</label>
+            </div>
+            <div class="grid" style="margin-top: 13px">
+              <div class="field">
+                <label>描边宽度 px</label>
+                <input type="number" min="0" max="8" step="0.5" data-path="overlay.textStrokeWidth" />
+              </div>
+              <div class="field">
+                <label>描边颜色（支持 rgba）</label>
+                <input type="text" data-path="overlay.textStrokeColor" placeholder="rgba(0,0,0,0.85)" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>卡片与头像</h2>
+            <div class="switches">
+              <label class="switch"><input type="checkbox" data-path="overlay.card.enabled" /><span class="track"></span>显示卡片背景</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.avatar.show" /><span class="track"></span>显示头像</label>
+            </div>
+            <div class="grid" style="margin-top: 13px">
+              <div class="field span2">
+                <label>卡片背景（支持 rgba / 渐变）</label>
+                <input type="text" data-path="overlay.card.bg" placeholder="rgba(18,18,20,0.55)" />
+              </div>
+              <div class="field span2">
+                <label>卡片边框（CSS 值，留空为无）</label>
+                <input type="text" data-path="overlay.card.border" placeholder="1px solid rgba(255,255,255,0.10)" />
+              </div>
+              <div class="field"><label>圆角 px</label><input type="number" min="0" max="60" step="1" data-path="overlay.card.radius" /></div>
+              <div class="field"><label>内边距 X</label><input type="number" min="0" max="60" step="1" data-path="overlay.card.paddingX" /></div>
+              <div class="field"><label>内边距 Y</label><input type="number" min="0" max="60" step="1" data-path="overlay.card.paddingY" /></div>
+              <div class="field"><label>背景模糊 px</label><input type="number" min="0" max="40" step="1" data-path="overlay.card.blur" /></div>
+              <div class="field"><label>头像尺寸 px</label><input type="number" min="16" max="96" step="2" data-path="overlay.avatar.size" /></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>动画</h2>
+            <div class="grid">
+              <div class="field">
+                <label>入场动画</label>
+                <select data-path="overlay.animation.in">
+                  <option value="slide">滑入</option>
+                  <option value="fade">淡入</option>
+                  <option value="pop">弹出</option>
+                  <option value="up">上浮</option>
+                  <option value="none">无</option>
+                </select>
+              </div>
+              <div class="field"><label>入场时长 ms</label><input type="number" min="0" max="2000" step="20" data-path="overlay.animation.inDuration" /></div>
+              <div class="field"><label>出场时长 ms</label><input type="number" min="0" max="2000" step="20" data-path="overlay.animation.outDuration" /></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>关键词高亮</h2>
+            <p class="hint">命中关键词的文字会被高亮，适合提醒「链接」「抽奖」这类消息。</p>
+            <div class="grid">
+              <div class="field span2">
+                <label>关键词（每行一个，也可用逗号分隔）</label>
+                <textarea data-path="overlay.highlight.keywords" data-array="1" placeholder="抽奖&#10;福利&#10;链接"></textarea>
+              </div>
+              <div class="field"><label>高亮文字色</label><input type="color" data-path="overlay.highlight.color" /></div>
+              <div class="field span2"><label>高亮背景（支持 rgba）</label><input type="text" data-path="overlay.highlight.bg" placeholder="rgba(255,77,109,0.85)" /></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 采集 ==================== -->
+        <section class="pane" data-pane="source">
+          <div class="card">
+            <h2>采集控制</h2>
+            <p class="hint">
+              插件不会去破解小红书的签名，而是<b>旁听</b>真实客户端自己的弹幕长连接：要么接管「小红书直播助手」，
+              要么开一个真实 Chrome 打开能看见弹幕的网页。两条路走的是同一个通道，解析代码完全一样。
+            </p>
+            <div class="grid">
+              <div class="field">
+                <label>数据源</label>
+                <select data-path="source.mode">
+                  <option value="app">小红书直播助手（普通用户推荐）</option>
+                  <option value="xhs">网页中控台（商家 / 达人后台）</option>
+                  <option value="mock">本地模拟数据（调试样式）</option>
+                </select>
+              </div>
+              <div class="field mode-xhs">
+                <label>浏览器窗口</label>
+                <select data-path="source.headless">
+                  <option value="false">显示窗口（推荐，扫码要用）</option>
+                  <option value="true">隐藏窗口</option>
+                </select>
+              </div>
+              <div class="field mode-app">
+                <label>调试端口（被占用就换一个）</label>
+                <input type="number" data-path="source.debugPort" min="1024" max="65535" />
+              </div>
+            </div>
+
+            <p class="hint small mode-app">
+              <b>普通用户用这个就行。</b>插件会自己拉起「小红书直播助手」，从 App 自己的弹幕长连接里读消息——
+              不需要中控台权限，也不用再扫一次码（用的是 App 里已登录的账号）。
+              如果 App 现在正开着，请先<b>完全退出</b>（右键托盘图标 → 退出），再点右上角「启动采集」。
+              万一插件拉不起来（没弹 UAC、或点了「否」），双击项目里的 <code>start-helper-debug.cmd</code>，
+              再回来点一次「启动采集」就能接上。
+            </p>
+
+            <div class="field field-full mode-app">
+              <label>直播助手位置（留空自动探测）</label>
+              <input type="text" data-path="source.appPath" placeholder="留空即可，例如 D:\Program Files\xhs-live-helper\4.11.0_xxx\xhs-live-helper.exe" />
+            </div>
+
+            <div class="field field-full mode-xhs">
+              <label>中控台地址（哪个网页能看到弹幕，就填哪个）</label>
+              <div class="url-row">
+                <select id="consolePreset">
+                  <option value="ark">方舟 · 商家（店铺）直播中控台</option>
+                  <option value="pgy">蒲公英 · 达人直播中控台</option>
+                  <option value="custom">自定义</option>
+                </select>
+                <input type="text" data-path="source.consoleUrl" />
+              </div>
+            </div>
+
+            <p class="hint small mode-xhs">
+              <b>方舟</b>是商家（店铺）后台，普通个人账号登进去可能只看到招商 / 入驻页面；达人直播在
+              <b>蒲公英</b>；如果你用「小红书直播助手」开播、App 里就能看弹幕，那就打开<b>自己的直播间页面</b>即可。
+              拿不准也没关系：启动后在弹出的窗口里自己点进能看见弹幕的页面，插件会自动接上<b>任何标签页</b>里的弹幕通道。
+            </p>
+
+            <div class="row-gap mode-xhs">
+              <button class="btn tiny" id="btnLogin">打开登录页</button>
+              <button class="btn tiny" id="btnReload">刷新中控台</button>
+              <button class="btn tiny" id="btnFocus">把浏览器调到前台</button>
+            </div>
+            <div class="row-gap mode-app">
+              <button class="btn tiny" id="btnFocusApp">把直播助手调到前台</button>
+            </div>
+
+            <div class="kv">
+              <div class="item"><div class="k">状态</div><div class="v" id="kvState">—</div></div>
+              <div class="item"><div class="k">已收帧</div><div class="v" id="kvFrames">0</div></div>
+              <div class="item"><div class="k">已出弹幕</div><div class="v" id="kvEvents">0</div></div>
+              <div class="item"><div class="k">WS 连接</div><div class="v" id="kvSockets">0</div></div>
+              <div class="item"><div class="k">弹幕层在线</div><div class="v" id="kvClients">0</div></div>
+            </div>
+
+            <div class="notice" id="sourceNotice"></div>
+          </div>
+
+          <div class="card">
+            <h2>怎么开播都能用</h2>
+            <p class="hint" style="margin-bottom: 10px">
+              推流方式和弹幕采集无关：你用 OBS 直接推、用「小红书直播助手」推，都走同一条弹幕通道。
+              下面按数据源分成两种，插件会自动按你选的走。
+            </p>
+            <div class="steps mode-app">
+              <div><b>1</b><span>先把「小红书直播助手」完全退出（含托盘图标），插件要自己带调试端口把它拉起来</span></div>
+              <div><b>2</b><span>点右上角「启动采集」，插件会自动打开直播助手，并接上它的弹幕长连接</span></div>
+              <div><b>3</b><span>在 App 里登录、开播；状态变成「接收中」后右侧预览就会滚起来</span></div>
+              <div><b>4</b><span>把 OBS 地址填进 OBS 的「浏览器」源，宽度 800、高度 1000</span></div>
+            </div>
+            <div class="steps mode-xhs">
+              <div><b>1</b><span>点右上角「启动采集」，会弹出一个 Chrome 窗口</span></div>
+              <div><b>2</b><span>在该窗口登录小红书（商家登方舟、达人登蒲公英），进入能看见弹幕的页面</span></div>
+              <div><b>3</b><span>状态变成「接收中」后，右侧预览就会开始滚动弹幕</span></div>
+              <div><b>4</b><span>把 OBS 地址填进 OBS 的「浏览器」源，宽度 800、高度 1000</span></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 消息 ==================== -->
+        <section class="pane" data-pane="message">
+          <div class="card">
+            <h2>显示哪些消息</h2>
+            <p class="hint">关闭的类型仍然会被接收和统计，只是不画到画面上。</p>
+            <div class="switches">
+              <label class="switch"><input type="checkbox" data-path="overlay.show.comment" /><span class="track"></span>弹幕（文字）</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.show.enter" /><span class="track"></span>进场</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.show.follow" /><span class="track"></span>关注</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.show.like" /><span class="track"></span>点赞</label>
+              <label class="switch"><input type="checkbox" data-path="overlay.show.gift" /><span class="track"></span>礼物</label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>事件文案</h2>
+            <p class="hint">比如把「关注了主播」改成「新朋友关注」，会立刻反映到画面上。</p>
+            <div class="grid">
+              <div class="field"><label>进场</label><input type="text" data-path="overlay.text.enter" /></div>
+              <div class="field"><label>关注</label><input type="text" data-path="overlay.text.follow" /></div>
+              <div class="field"><label>点赞</label><input type="text" data-path="overlay.text.like" /></div>
+              <div class="field"><label>礼物</label><input type="text" data-path="overlay.text.gift" /></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>状态角标</h2>
+            <p class="hint">画面右下角显示「已连接 / 断线」，正式推流前记得关掉。</p>
+            <div class="switches">
+              <label class="switch"><input type="checkbox" data-path="overlay.showStatus" /><span class="track"></span>显示连接状态角标</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 过滤 ==================== -->
+        <section class="pane" data-pane="filter">
+          <div class="card">
+            <h2>过滤与防刷屏</h2>
+            <p class="hint">被过滤掉的消息不会出现在弹幕层，也不会进入统计。</p>
+            <div class="grid">
+              <div class="field span2">
+                <label>屏蔽关键词（命中即丢弃，每行一个）</label>
+                <textarea data-path="overlay.filter.blockKeywords" data-array="1" placeholder="加微信&#10;私聊"></textarea>
+              </div>
+              <div class="field span2">
+                <label>屏蔽用户（昵称或用户 ID，每行一个）</label>
+                <textarea data-path="overlay.filter.blockUsers" data-array="1"></textarea>
+              </div>
+              <div class="field"><label>最短字数</label><input type="number" min="0" max="100" data-path="overlay.filter.minLength" /></div>
+              <div class="field"><label>最长字数</label><input type="number" min="0" max="500" data-path="overlay.filter.maxLength" /></div>
+              <div class="field"><label>同一用户冷却 ms</label><input type="number" min="0" max="60000" step="100" data-path="overlay.filter.userCooldownMs" /></div>
+              <div class="field"><label>全局每秒上限（0 = 不限）</label><input type="number" min="0" max="200" data-path="overlay.filter.ratePerSecond" /></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 高级 ==================== -->
+        <section class="pane" data-pane="advanced">
+          <div class="card">
+            <h2>自定义 CSS</h2>
+            <p class="hint">追加到弹幕层页面，可以覆盖任何样式。改错了点「恢复默认」即可。</p>
+            <textarea data-path="overlay.customCss" rows="8" placeholder=".card { border-radius: 4px; }&#10;.nick { font-weight: 800; }"></textarea>
+          </div>
+
+          <div class="card">
+            <h2>配置备份</h2>
+            <p class="hint">换电脑或者调好一套想留着，导出成 JSON；以后导入回来即可。</p>
+            <div class="row-gap" style="margin-top: 0">
+              <button class="btn tiny" id="btnSave">立即保存</button>
+              <button class="btn tiny" id="btnExport">导出配置</button>
+              <button class="btn tiny" id="btnImport">导入配置</button>
+              <button class="btn tiny ghost" id="btnReset">恢复默认</button>
+              <input type="file" id="fileImport" accept="application/json,.json" hidden />
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 调试 ==================== -->
+        <section class="pane" data-pane="debug">
+          <div class="card">
+            <h2>原始帧调试</h2>
+            <p class="hint">
+              协议变了、或者事件没出来时看这里。若出现大量「未知 type」，把 type 名字记下来就能补上映射。
+            </p>
+            <div class="row-gap" style="margin-top: 0">
+              <button class="btn tiny" id="btnRawToggle">开始记录</button>
+              <button class="btn tiny ghost" id="btnRawClear">清空</button>
+              <span class="hint" style="margin: 0; align-self: center" id="rawCount">0 条</span>
+            </div>
+            <div class="raw-log" id="rawLog"><div class="empty">还没有记录</div></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ==================== 右栏 ==================== -->
+      <aside class="right">
+        <section class="card preview-card">
+          <h2>实时预览</h2>
+          <div class="preview-head">
+            <span class="hint" style="margin: 0">800×1000 等比缩放</span>
+            <div class="seg" id="previewBg">
+              <button class="on" data-bg="dark" type="button">深色</button>
+              <button data-bg="light" type="button">浅色</button>
+              <button data-bg="green" type="button">绿幕</button>
+            </div>
+          </div>
+          <div class="preview-wrap" data-bg="dark"><iframe id="preview" src="/overlay" title="预览"></iframe></div>
+          <div class="test-row">
+            <button class="btn tiny" data-test="comment">弹幕</button>
+            <button class="btn tiny" data-test="enter">进场</button>
+            <button class="btn tiny" data-test="follow">关注</button>
+            <button class="btn tiny" data-test="like">点赞</button>
+            <button class="btn tiny" data-test="gift">礼物</button>
+            <button class="btn tiny ghost" id="btnPreviewOpen">新窗口</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>OBS 浏览器源</h2>
+          <p class="hint">
+            在 OBS 里加「浏览器」源，URL 粘贴下面的地址，宽 800、高 1000，自定义帧率不用勾。
+          </p>
+          <div class="url-row">
+            <input type="text" id="obsUrl" readonly />
+            <button class="btn tiny" id="btnCopyObs">复制</button>
+          </div>
+          <div class="notice" style="margin-top: 12px">
+            弹幕层页面背景是透明的，直接叠在直播画面上即可，不需要做色键。
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="toast" id="toast"></div>
+    <script type="module" src="/admin/admin.js"></script>
+  </body>
+</html>

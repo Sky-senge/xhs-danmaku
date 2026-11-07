@@ -1,0 +1,24 @@
+{
+  "name": "xhs-danmaku",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "小红书直播弹幕 / OBS 浏览器源弹幕层",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "mock": "node src/index.js --mock",
+    "shot": "node scripts/shot.mjs",
+    "shot:admin": "node scripts/shot-admin.mjs",
+    "shot:obs": "node scripts/shot-obs.mjs 800 1000",
+    "shot:themes": "node scripts/shot-themes.mjs",
+    "probe": "node scripts/probe-source.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright-core": "^1.65.0",
+    "ws": "^8.22.1"
+  }
+}
