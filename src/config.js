@@ -109,6 +109,24 @@ export const DEFAULTS = {
     /** 右下角显示连接状态，正式推流前建议关掉 */
     showStatus: false,
   },
+  /** 语音播报（Edge 神经音色，声音由弹幕层页面播放 → OBS 浏览器源「通过 OBS 控制音频」） */
+  tts: {
+    enabled: false,
+    voice: 'zh-CN-XiaoxiaoNeural',
+    /** 语速 / 音量，SSML 相对值 */
+    rate: '+0%',
+    volume: '+0%',
+    /** 播报时是否先念昵称（「小明说，…」） */
+    readNickname: false,
+    /** 单条最多念多少字，超出截断 */
+    maxChars: 60,
+    /** 两条之间的最小间隔，防止叠音 */
+    minIntervalMs: 800,
+    /** 排队上限，超过就丢掉后来的（宁可少念，不能播上一分钟的） */
+    maxQueue: 5,
+    /** browser = 弹幕层页面播（推荐）；local = 服务端用 ffplay 播 */
+    play: 'browser',
+  },
 };
 
 const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);

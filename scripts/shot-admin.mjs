@@ -78,7 +78,7 @@ await page.click('[data-preset="classic"]');
 await page.waitForTimeout(600);
 
 // 各标签页
-for (const tab of ['source', 'message', 'filter', 'advanced', 'debug']) {
+for (const tab of ['source', 'voice', 'message', 'filter', 'advanced', 'debug']) {
   await page.click(`.tab[data-tab="${tab}"]`);
   await page.waitForTimeout(350);
   console.log('标签页', tab);

@@ -288,6 +288,51 @@ function wsUrl() {
   return `${proto}//${location.host}/ws`;
 }
 
+// ---------------------------------------------------------------------------
+// 语音播报
+// 服务端合成好 mp3 后用 WS 推一条 { id, url }，这里按顺序播。
+// 声音由这个页面发出，OBS 里记得勾上「通过 OBS 控制音频」。
+// ---------------------------------------------------------------------------
+const speechQueue = [];
+let speechPlaying = false;
+
+function enqueueSpeech(item) {
+  if (!item || !item.url) return;
+  if (speechQueue.length > 6) speechQueue.shift();
+  speechQueue.push(item);
+  playNextSpeech();
+}
+
+function playNextSpeech() {
+  if (speechPlaying) return;
+  const item = speechQueue.shift();
+  if (!item) return;
+  speechPlaying = true;
+
+  const audio = new Audio(item.url);
+  audio.preload = 'auto';
+  let settled = false;
+  const done = () => {
+    if (settled) return;
+    settled = true;
+    speechPlaying = false;
+    playNextSpeech();
+  };
+
+  audio.onended = done;
+  audio.onerror = done;
+  setTimeout(done, 30000);
+
+  const p = audio.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch((err) => {
+      // OBS 默认允许自动播放；普通浏览器里第一次需要先点一下页面
+      console.warn('[tts] 播放被拦截：', err && err.name);
+      done();
+    });
+  }
+}
+
 function connect() {
   try {
     ws = new WebSocket(wsUrl());
@@ -320,6 +365,10 @@ function connect() {
     }
     if (msg.type === 'config') {
       applyConfig(msg.data);
+      return;
+    }
+    if (msg.type === 'speak') {
+      enqueueSpeech(msg.data);
     }
   };
 

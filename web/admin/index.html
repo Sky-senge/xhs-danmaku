@@ -35,6 +35,7 @@
         <nav class="tabs" id="tabs">
           <button class="tab active" data-tab="style">样式</button>
           <button class="tab" data-tab="source">采集</button>
+          <button class="tab" data-tab="voice">语音播报</button>
           <button class="tab" data-tab="message">消息</button>
           <button class="tab" data-tab="filter">过滤</button>
           <button class="tab" data-tab="advanced">高级</button>
@@ -360,6 +361,78 @@
               <div><b>3</b><span>状态变成「接收中」后，右侧预览就会开始滚动弹幕</span></div>
               <div><b>4</b><span>把 OBS 地址填进 OBS 的「浏览器」源，宽度 800、高度 1000</span></div>
             </div>
+          </div>
+        </section>
+
+        <!-- ==================== 语音播报 ==================== -->
+        <section class="pane" data-pane="voice">
+          <div class="card">
+            <h2>语音播报</h2>
+            <p class="hint">
+              把弹幕念出来。声音由弹幕层页面（OBS 浏览器源）发出，<b>记得在 OBS 里勾选「通过 OBS 控制音频」</b>，
+              否则混音器里不会有这一路声音。
+            </p>
+            <div class="switches">
+              <label class="switch"><input type="checkbox" data-path="tts.enabled" /><span class="track"></span>开启弹幕语音播报</label>
+            </div>
+            <div class="grid">
+              <div class="field">
+                <label>音色</label>
+                <select data-path="tts.voice">
+                  <option value="zh-CN-XiaoxiaoNeural">晓晓 · 女 · 温柔（推荐）</option>
+                  <option value="zh-CN-XiaoyiNeural">晓伊 · 女 · 甜一点</option>
+                  <option value="zh-CN-YunxiNeural">云希 · 男 · 活泼</option>
+                  <option value="zh-CN-YunjianNeural">云健 · 男 · 浑厚</option>
+                  <option value="zh-CN-YunxiaNeural">云夏 · 男 · 少年</option>
+                  <option value="zh-CN-YunyangNeural">云扬 · 男 · 播音腔</option>
+                  <option value="zh-CN-liaoning-XiaobeiNeural">晓北 · 女 · 东北话</option>
+                  <option value="zh-CN-shaanxi-XiaoniNeural">晓妮 · 女 · 陕西话</option>
+                  <option value="zh-HK-HiuMaanNeural">曉曼 · 女 · 粤语</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>播到哪里</label>
+                <select data-path="tts.play">
+                  <option value="browser">弹幕层页面（推荐，OBS 里勾选控制音频）</option>
+                  <option value="local">本机播放（ffplay，OBS 用「应用音频采集」抓）</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>语速与节奏</h2>
+            <p class="hint">直播高峰一秒好几条，念不完就丢掉后面的，保证念到的是「现在」的弹幕。</p>
+            <div class="grid">
+              <div class="field">
+                <label>语速 <b data-range="vRate">+0%</b></label>
+                <input type="range" min="-50" max="80" step="10" data-path="tts.rate" data-range="vRate" data-percent="1" />
+              </div>
+              <div class="field">
+                <label>音量 <b data-range="vVolume">+0%</b></label>
+                <input type="range" min="-50" max="50" step="10" data-path="tts.volume" data-range="vVolume" data-percent="1" />
+              </div>
+              <div class="field"><label>两条之间最短间隔（毫秒）</label><input type="number" min="0" max="5000" step="100" data-path="tts.minIntervalMs" /></div>
+              <div class="field"><label>最多排队几条（超出丢弃）</label><input type="number" min="1" max="30" data-path="tts.maxQueue" /></div>
+              <div class="field"><label>单条最多念多少字</label><input type="number" min="10" max="200" data-path="tts.maxChars" /></div>
+              <div class="field">
+                <label>是否念昵称</label>
+                <select data-path="tts.readNickname">
+                  <option value="false">只念内容（推荐，不吵）</option>
+                  <option value="true">念「昵称说，内容」</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>试听</h2>
+            <p class="hint">试听会走完整的合成流程，能听到就说明网络和音色都没问题。</p>
+            <div class="url-row">
+              <input type="text" id="ttsTestText" placeholder="随便打一句，比如：这个颜色也太好看了吧" />
+              <button class="btn" id="btnTtsTest">试听</button>
+            </div>
+            <p class="hint small" id="ttsState">未开启</p>
           </div>
         </section>
 

@@ -70,6 +70,10 @@ const isBoolSelect = (el) =>
 function readControl(el, path) {
   if (el.type === 'checkbox') return el.checked;
   if (isBoolSelect(el)) return el.value === 'true';
+  if (el.dataset.percent) {
+    const n = Number(el.value) || 0;
+    return `${n >= 0 ? '+' : ''}${n}%`;
+  }
   if (el.type === 'number' || el.type === 'range') return Number(el.value);
   if (el.dataset.array) {
     return el.value
@@ -85,6 +89,14 @@ function writeControl(el, value) {
     el.checked = Boolean(value);
   } else if (isBoolSelect(el)) {
     el.value = value ? 'true' : 'false';
+  } else if (el.dataset.percent) {
+    const n = parseInt(String(value ?? '0'), 10) || 0;
+    if (el.value !== String(n)) el.value = String(n);
+    if (el.dataset.range) {
+      const out = document.getElementById(el.dataset.range);
+      if (out) out.textContent = `${n >= 0 ? '+' : ''}${n}%`;
+    }
+    return;
   } else if (el.dataset.array) {
     el.value = Array.isArray(value) ? value.join('\n') : String(value ?? '');
   } else if (el.value !== String(value ?? '')) {
@@ -360,7 +372,7 @@ function bindThemeAndPresets() {
 
 /* ------------------------------ 标签页 ------------------------------ */
 
-const TABS = ['style', 'source', 'message', 'filter', 'advanced', 'debug'];
+const TABS = ['style', 'source', 'voice', 'message', 'filter', 'advanced', 'debug'];
 
 function activateTab(name) {
   if (!TABS.includes(name)) name = 'style';
@@ -443,6 +455,27 @@ function renderStatus(data) {
     notice.classList.add('warn');
     notice.textContent += `　｜　未识别的事件 type：${names.map((n) => `${n}×${unknown[n]}`).join('、')}`;
   }
+
+  renderTtsState(data.tts);
+}
+
+function renderTtsState(t) {
+  const el = $('#ttsState');
+  if (!el) return;
+  if (!t) {
+    el.textContent = '';
+    return;
+  }
+  if (!t.enabled) {
+    el.textContent = '未开启（打开上面的开关后，每一条弹幕都会被念出来）';
+    return;
+  }
+  const parts = [`已播 ${t.spoken || 0} 条`];
+  if (t.skipped) parts.push(`跳过 ${t.skipped} 条（排队满了）`);
+  if (t.queue) parts.push(`队列 ${t.queue}`);
+  if (t.failed) parts.push(`失败 ${t.failed}`);
+  if (t.lastError) parts.push(`最近错误：${t.lastError}`);
+  el.textContent = parts.join('　·　');
 }
 
 async function pollStatus() {
@@ -600,6 +633,28 @@ function wireActions() {
   const btnFocusApp = $('#btnFocusApp');
   if (btnFocusApp) {
     btnFocusApp.onclick = () => action(() => api('/api/focus', { method: 'POST' }), '已切换窗口');
+  }
+
+  const btnTtsTest = $('#btnTtsTest');
+  if (btnTtsTest) {
+    btnTtsTest.onclick = async () => {
+      const text = ($('#ttsTestText').value || '').trim();
+      btnTtsTest.disabled = true;
+      const label = btnTtsTest.textContent;
+      btnTtsTest.textContent = '合成中…';
+      try {
+        const r = await api('/api/tts/preview', {
+          method: 'POST',
+          body: JSON.stringify({ text }),
+        });
+        toast(r.cleaned ? `正在念：${r.cleaned.slice(0, 24)}` : '已发送');
+      } catch (err) {
+        toast(`试听失败：${err.message}`);
+      } finally {
+        btnTtsTest.disabled = false;
+        btnTtsTest.textContent = label;
+      }
+    };
   }
 
   $('#btnSave').onclick = () => action(saveConfig, '已保存');

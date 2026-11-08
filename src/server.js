@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import { WEB_DIR, loadConfig, saveConfig, resetConfig } from './config.js';
 import { bus, makeEvent } from './bus.js';
 import { avatarFor } from './avatar.js';
+import { tts, VOICES, cleanText } from './tts.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -132,6 +133,13 @@ export function startServer(manager) {
   bus.on('raw', (entry) => broadcast({ type: 'raw', data: entry }));
   manager.onStatus((status) => broadcast({ type: 'source', data: status }));
 
+  tts.configure(cfg.tts);
+  bus.on('event', (event) => tts.feed(event));
+  tts.on('speak', (item) => broadcast({ type: 'speak', data: item }));
+  tts.on('error', ({ message }) => {
+    bus.logRaw({ dir: 'tts-error', text: message });
+  });
+
   async function handleApi(req, res, pathname, url, mgr) {
     const method = req.method;
 
@@ -147,12 +155,14 @@ export function startServer(manager) {
       const patch = await readBody(req);
       const next = saveConfig(patch);
       bus.setFilters(() => ({ ...next.overlay.filter, show: next.overlay.show }));
+      tts.configure(next.tts);
       broadcast({ type: 'config', data: next.overlay });
       return sendJson(res, 200, { ok: true, config: next });
     }
 
     if (pathname === '/api/config/reset' && method === 'POST') {
       const next = resetConfig();
+      tts.configure(next.tts);
       broadcast({ type: 'config', data: next.overlay });
       return sendJson(res, 200, { ok: true, config: next });
     }
@@ -162,9 +172,38 @@ export function startServer(manager) {
         ok: true,
         source: mgr.getStatus(),
         stats: bus.stats,
+        tts: tts.status(),
         clients: wss.clients.size,
         config: { port: loadConfig().server.port },
       });
+    }
+
+    if (pathname === '/api/tts/voices' && method === 'GET') {
+      return sendJson(res, 200, { ok: true, voices: VOICES });
+    }
+
+    if (pathname === '/api/tts/preview' && method === 'POST') {
+      const body = await readBody(req);
+      const text = String(body.text || '').trim() || '欢迎来到直播间，喜欢的话点个关注哦';
+      const item = tts.preview(text, String(body.name || '').trim());
+      return sendJson(res, 200, {
+        ok: Boolean(item),
+        item,
+        cleaned: cleanText(text, loadConfig().tts.maxChars),
+        error: item ? undefined : '这段文字没有可朗读的内容（可能全是表情或链接）',
+      });
+    }
+
+    if (pathname.startsWith('/api/tts/audio/') && method === 'GET') {
+      const id = pathname.slice('/api/tts/audio/'.length).replace(/\.mp3$/, '');
+      const buf = tts.audio(id);
+      if (!buf) return sendJson(res, 404, { ok: false, error: '音频不存在或已过期' });
+      res.writeHead(200, {
+        'content-type': 'audio/mpeg',
+        'content-length': buf.length,
+        'cache-control': 'no-store',
+      });
+      return res.end(buf);
     }
 
     if (pathname === '/api/start' && method === 'POST') {

@@ -23,6 +23,7 @@
     "probe": "node scripts/probe-source.mjs"
   },
   "dependencies": {
+    "msedge-tts": "^2.1.1",
     "playwright-core": "^1.65.0",
     "ws": "^8.22.1"
   }
