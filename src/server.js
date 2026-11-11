@@ -7,6 +7,9 @@ import { bus, makeEvent } from './bus.js';
 import { avatarFor } from './avatar.js';
 import { tts, VOICES, cleanText } from './tts.js';
 
+/** 与 web/overlay/overlay.js 里的 OVERLAY_BUILD 保持一致；不一致说明 OBS 里的页面是旧的 */
+const OVERLAY_BUILD = '2026-11-11';
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -118,14 +121,42 @@ export function startServer(manager) {
 
   wss.on('connection', (ws) => {
     const current = loadConfig();
+    ws.client = { kind: 'unknown', build: '' };
     ws.send(
       JSON.stringify({
         type: 'hello',
+        build: OVERLAY_BUILD,
         overlay: current.overlay,
         source: manager.getStatus(),
         recent: bus.recent.slice(-20),
+        tts: tts.status(),
       }),
     );
+    ws.on('message', (raw) => {
+      let msg;
+      try {
+        msg = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+      if (msg.type === 'hello') {
+        // 弹幕层页面自报身份：用来判断 OBS 里那页是不是旧版本
+        ws.client = {
+          kind: String(msg.kind || 'unknown').slice(0, 16),
+          build: String(msg.build || '').slice(0, 24),
+        };
+        if (ws.client.kind === 'overlay' && ws.client.build !== OVERLAY_BUILD) {
+          bus.logRaw({
+            dir: 'tts',
+            text: `弹幕层页面版本 ${ws.client.build || '未知'}，当前 ${OVERLAY_BUILD}（在 OBS 里右键该源 →「刷新页面」）`,
+          });
+        }
+        return;
+      }
+      if (msg.type === 'speech-ack') {
+        tts.noteAck(msg.data);
+      }
+    });
     ws.on('error', () => {});
   });
 
@@ -168,11 +199,22 @@ export function startServer(manager) {
     }
 
     if (pathname === '/api/status') {
+      const live = [...wss.clients].filter((c) => c.readyState === 1);
+      const overlaySockets = live.filter((c) => c.client && c.client.kind === 'overlay');
+      // 连上了却从没自报身份：多半是加语音之前就打开的旧页面（那段代码里没有 hello）
+      const unknownClients = live.filter((c) => !c.client || c.client.kind === 'unknown').length;
+      const overlayBuild = overlaySockets[0]?.client.build || '';
       return sendJson(res, 200, {
         ok: true,
         source: mgr.getStatus(),
         stats: bus.stats,
-        tts: tts.status(),
+        tts: {
+          ...tts.status(),
+          overlayClients: overlaySockets.length,
+          unknownClients,
+          overlayBuild,
+          overlayStale: Boolean(overlayBuild) && overlayBuild !== OVERLAY_BUILD,
+        },
         clients: wss.clients.size,
         config: { port: loadConfig().server.port },
       });

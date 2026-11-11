@@ -471,16 +471,57 @@ function renderTtsState(t) {
     return;
   }
   const parts = [`已播 ${t.spoken || 0} 条`];
+  if (t.overlayStale) {
+    parts.push('⚠ 弹幕层页面是旧版本（在 OBS 里右键该源 →「刷新页面」）');
+  } else if (typeof t.overlayClients === 'number') {
+    if (t.overlayClients > 0) {
+      parts.push(`弹幕层连接 ${t.overlayClients} 个`);
+    } else if (Number(t.unknownClients) > 0) {
+      // 有 WebSocket 连着但没自报身份 —— 多半是加语音之前就打开的旧页面
+      parts.push('⚠ 连上的弹幕层页面是旧版本，在 OBS 里右键该源 →「刷新页面」');
+    } else {
+      parts.push('⚠ 没有弹幕层页面连接（OBS 里那个浏览器源没开？）');
+    }
+  }
+  if (t.lastPlay && t.overlayClients > 0) {
+    parts.push(
+      t.lastPlay.ok
+        ? `最近一次：弹幕层已播放`
+        : `最近一次：弹幕层没播出来（${t.lastPlay.reason || '原因未知'}）`,
+    );
+  }
   if (t.skipped) parts.push(`跳过 ${t.skipped} 条（排队满了）`);
   if (t.queue) parts.push(`队列 ${t.queue}`);
-  if (t.failed) parts.push(`失败 ${t.failed}`);
+  if (t.failed) parts.push(`合成失败 ${t.failed}`);
   if (t.lastError) parts.push(`最近错误：${t.lastError}`);
   el.textContent = parts.join('　·　');
+}
+
+/** 试听：在控制台页面自己播一遍，不依赖 OBS 那边有没有开 */
+async function playPreviewLocally(id) {
+  for (let i = 0; i < 20; i += 1) {
+    try {
+      const res = await fetch(`/api/tts/audio/${id}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => URL.revokeObjectURL(url);
+        await audio.play();
+        return true;
+      }
+    } catch {
+      /* 还没合成好，继续等 */
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return false;
 }
 
 async function pollStatus() {
   try {
     const data = await api('/api/status');
+    state.lastStatus = data;
     renderStatus(data);
   } catch {
     /* 服务没起来时静默 */
@@ -648,6 +689,10 @@ function wireActions() {
           body: JSON.stringify({ text }),
         });
         toast(r.cleaned ? `正在念：${r.cleaned.slice(0, 24)}` : '已发送');
+        if (r.item && r.item.id) {
+          const ok = await playPreviewLocally(r.item.id);
+          if (!ok) toast('合成超时了，稍后再试；或检查能不能连上微软朗读接口');
+        }
       } catch (err) {
         toast(`试听失败：${err.message}`);
       } finally {
@@ -740,10 +785,18 @@ async function boot() {
 
   // 配置在别处被改动时（比如另一个标签页恢复默认），同步一次
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.onopen = () => {
+    // 自报身份：否则服务端会把控制台这条连接当成「不认识的老页面」
+    ws.send(JSON.stringify({ type: 'hello', kind: 'admin', build: 'admin' }));
+  };
   ws.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'source') renderStatus({ source: msg.data, clients: NaN });
+      if (msg.type === 'source') {
+        // 只覆盖 source 字段，别把 tts 等其他状态清空（否则那行会闪成空白）
+        state.lastStatus = { ...(state.lastStatus || {}), source: msg.data };
+        renderStatus(state.lastStatus);
+      }
     } catch {
       /* ignore */
     }

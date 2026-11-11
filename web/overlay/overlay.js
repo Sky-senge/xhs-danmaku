@@ -9,6 +9,12 @@ const statusEl = document.getElementById('status');
 const statusLabel = statusEl.querySelector('.label');
 const customCssEl = document.getElementById('custom-css');
 
+/** 页面版本；服务端比对后能发现「OBS 里开着的还是旧页面」这种坑 */
+const OVERLAY_BUILD = '2026-11-11';
+
+/** 控制台右栏的预览 iframe 也加载本页，但它不算「真正的弹幕层」：不播音、单独计数 */
+const IS_PREVIEW = new URLSearchParams(location.search).has('preview');
+
 // 写内联样式（不是 :root）：内联优先级最高，保证用户在控制台里改的值不会被主题 CSS 覆盖
 const bodyStyle = document.body.style;
 
@@ -296,6 +302,31 @@ function wsUrl() {
 const speechQueue = [];
 let speechPlaying = false;
 
+function send(msg) {
+  try {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  } catch {
+    /* 忽略 */
+  }
+}
+
+/**
+ * 页面是旧版本时自动刷新一次（30 秒内只刷一次，避免来回刷）。
+ * 刷新后拿到的新脚本版本号与服务端一致，就不会再触发。
+ */
+function autoReloadOnce() {
+  try {
+    const last = Number(sessionStorage.getItem('xhs-overlay-reload') || 0);
+    if (Date.now() - last < 30000) return false;
+    sessionStorage.setItem('xhs-overlay-reload', String(Date.now()));
+  } catch {
+    /* 隐私模式拿不到 sessionStorage，就只刷这一次 */
+  }
+  console.warn('[overlay] 页面版本过旧，自动刷新一次');
+  setTimeout(() => location.reload(), 200);
+  return true;
+}
+
 function enqueueSpeech(item) {
   if (!item || !item.url) return;
   if (speechQueue.length > 6) speechQueue.shift();
@@ -308,29 +339,58 @@ function playNextSpeech() {
   const item = speechQueue.shift();
   if (!item) return;
   speechPlaying = true;
+  const started = Date.now();
 
+  // 挂到 DOM 上再播：有些 OBS/CEF 版本对「游离的 Audio 对象」处理不稳定
   const audio = new Audio(item.url);
   audio.preload = 'auto';
+  audio.style.display = 'none';
+  document.body.appendChild(audio);
+
   let settled = false;
-  const done = () => {
+  const done = (ok, reason) => {
     if (settled) return;
     settled = true;
     speechPlaying = false;
+    try {
+      audio.pause();
+      audio.remove();
+    } catch {
+      /* 忽略 */
+    }
+    send({ type: 'speech-ack', data: { id: item.id, ok, reason: reason || '', ms: Date.now() - started } });
     playNextSpeech();
   };
 
-  audio.onended = done;
-  audio.onerror = done;
-  setTimeout(done, 30000);
+  audio.onended = () => done(true);
+  audio.onerror = () => done(false, '音频加载失败（服务重启后旧音频会过期）');
+  // 兜底：万一既没 ended 也没 error（CEF 偶发），别把队列卡死
+  setTimeout(() => done(false, '播放超时'), 30000);
 
-  const p = audio.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch((err) => {
-      // OBS 默认允许自动播放；普通浏览器里第一次需要先点一下页面
-      console.warn('[tts] 播放被拦截：', err && err.name);
-      done();
+  const attempt = (tries) => {
+    const p = audio.play();
+    if (!p || typeof p.then !== 'function') return;
+    p.then(() => {
+      /* 真正开始播了，等 onended */
+    }).catch((err) => {
+      const name = (err && err.name) || 'Error';
+      if (name === 'NotAllowedError' && tries > 0) {
+        // 自动播放被拦：等一小会儿再试一次（OBS 里通常不需要）
+        setTimeout(() => attempt(tries - 1), 400);
+        return;
+      }
+      if (name === 'NotAllowedError') {
+        done(false, '浏览器拦截了自动播放（OBS 里一般不会，普通浏览器要先点一下页面）');
+        return;
+      }
+      if (name === 'NotSupportedError') {
+        done(false, '音频格式不支持');
+        return;
+      }
+      done(false, `播放失败：${name}`);
     });
-  }
+  };
+  attempt(1);
 }
 
 function connect() {
@@ -344,6 +404,7 @@ function connect() {
   ws.onopen = () => {
     retry = 0;
     setStatus('ok', '已连接');
+    send({ type: 'hello', kind: IS_PREVIEW ? 'preview' : 'overlay', build: OVERLAY_BUILD });
   };
 
   ws.onmessage = (e) => {
@@ -354,6 +415,8 @@ function connect() {
       return;
     }
     if (msg.type === 'hello') {
+      // 服务端版本比本页面新 → 说明 OBS 里跑的还是很早之前加载的旧页面，自动刷一次
+      if (msg.build && msg.build !== OVERLAY_BUILD && autoReloadOnce()) return;
       applyConfig(msg.overlay);
       const now = Date.now();
       for (const ev of msg.recent || []) addEvent({ ...ev, ts: now });
@@ -368,7 +431,8 @@ function connect() {
       return;
     }
     if (msg.type === 'speak') {
-      enqueueSpeech(msg.data);
+      // 预览 iframe 不播音：否则控制台和 OBS 会各播一遍，回执也会算重
+      if (!IS_PREVIEW) enqueueSpeech(msg.data);
     }
   };
 

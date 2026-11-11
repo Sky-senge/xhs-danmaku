@@ -83,7 +83,17 @@ class Tts extends EventEmitter {
     this.engine = null;
     this.engineKey = '';
     this.chain = Promise.resolve();
-    this.stats = { spoken: 0, skipped: 0, failed: 0, lastError: '', lastAt: 0 };
+    this.stats = {
+      spoken: 0,
+      skipped: 0,
+      failed: 0,
+      played: 0,
+      blocked: 0,
+      lastError: '',
+      lastAt: 0,
+      /** @type {{id:string,ok:boolean,reason:string,at:number}|null} */
+      lastPlay: null,
+    };
   }
 
   configure(next) {
@@ -149,6 +159,24 @@ class Tts extends EventEmitter {
     this.queue.push(item);
     this._kick();
     return item;
+  }
+
+  /**
+   * 弹幕层页面回报「这条我播了 / 播不了」。
+   * 有了这个才能区分「合成成功但 OBS 里没声音」和「根本没合成」。
+   */
+  noteAck(ack) {
+    const id = String(ack?.id || '');
+    if (!id) return;
+    const ok = Boolean(ack?.ok);
+    const reason = String(ack?.reason || '').slice(0, 160);
+    this.stats.lastPlay = { id, ok, reason, at: Date.now() };
+    if (ok) this.stats.played += 1;
+    else {
+      this.stats.blocked += 1;
+      this.stats.lastError = reason || '弹幕层播放失败';
+      this.emit('error', { message: `弹幕层播放失败：${reason || '原因未知'}` });
+    }
   }
 
   audio(id) {
