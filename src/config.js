@@ -111,7 +111,7 @@ export const DEFAULTS = {
   },
   /** 语音播报（Edge 神经音色，声音由弹幕层页面播放 → OBS 浏览器源「通过 OBS 控制音频」） */
   tts: {
-    enabled: false,
+    enabled: true,
     voice: 'zh-CN-XiaoxiaoNeural',
     /** 语速 / 音量，SSML 相对值 */
     rate: '+0%',
@@ -142,9 +142,24 @@ export function deepMerge(base, patch) {
 }
 
 let cached = null;
+/** 只影响本次运行的覆盖项（命令行参数），永远不写回 config.json */
+let runtimePatch = {};
+let view = null;
+
+/** 命令行参数走这里：内存里生效，但不会被 saveConfig 落盘 */
+export function setRuntime(patch) {
+  runtimePatch = deepMerge(runtimePatch, patch || {});
+  view = null;
+}
 
 export function loadConfig() {
-  if (cached) return cached;
+  if (!cached) readFromDisk();
+  if (!Object.keys(runtimePatch).length) return cached;
+  if (!view) view = deepMerge(cached, runtimePatch);
+  return view;
+}
+
+function readFromDisk() {
   let stored = {};
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -158,16 +173,21 @@ export function loadConfig() {
 }
 
 export function saveConfig(patch) {
-  const next = deepMerge(loadConfig(), patch);
-  cached = next;
+  if (!cached) readFromDisk();
+  // 注意：从 cached（磁盘那份）合并，不能从 loadConfig() 合并——
+  // 否则命令行覆盖项（--mock / --port）会被一起写进 config.json
+  const next = deepMerge(cached, patch);
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = `${CONFIG_FILE}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf8');
   fs.renameSync(tmp, CONFIG_FILE); // 原子写，避免半截文件
-  return next;
+  cached = next;
+  view = null;
+  return loadConfig();
 }
 
 export function resetConfig() {
   cached = structuredClone(DEFAULTS);
+  view = null;
   return saveConfig({});
 }

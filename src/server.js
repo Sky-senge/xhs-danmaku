@@ -94,10 +94,16 @@ export function startServer(manager) {
   const cfg = loadConfig();
 
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
-    const pathname = decodeURIComponent(url.pathname);
-
     try {
+      let url;
+      let pathname;
+      try {
+        url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+        pathname = decodeURIComponent(url.pathname);
+      } catch {
+        // 畸形 URL（比如 GET /%）：直接 400，别让异常把请求挂死
+        return sendJson(res, 400, { ok: false, error: 'Bad Request' });
+      }
       if (pathname.startsWith('/api/')) {
         return await handleApi(req, res, pathname, url, manager);
       }
@@ -106,7 +112,8 @@ export function startServer(manager) {
       }
       serveStatic(req, res, pathname);
     } catch (err) {
-      sendJson(res, 500, { ok: false, error: err.message });
+      if (!res.headersSent) sendJson(res, 500, { ok: false, error: err.message });
+      else res.end();
     }
   });
 
@@ -171,6 +178,28 @@ export function startServer(manager) {
     bus.logRaw({ dir: 'tts-error', text: message });
   });
 
+  // 过滤器每次都从当前配置读，这样「恢复默认」也能立刻生效（以前用闭包捕获，复位后会失效）
+  bus.setFilters(() => {
+    const c = loadConfig();
+    return { ...c.overlay.filter, show: c.overlay.show };
+  });
+
+  /** 只接受已知分区的对象，挡住 {"tts":"x"} 这类会把配置写坏的请求 */
+  const SECTIONS = ['server', 'source', 'overlay', 'tts'];
+  function sanitizePatch(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const out = {};
+    for (const key of SECTIONS) {
+      const v = raw[key];
+      if (v && typeof v === 'object' && !Array.isArray(v)) out[key] = v;
+    }
+    return out;
+  }
+
+  function applyLive(next) {
+    tts.configure(next.tts);
+  }
+
   async function handleApi(req, res, pathname, url, mgr) {
     const method = req.method;
 
@@ -184,16 +213,15 @@ export function startServer(manager) {
 
     if (pathname === '/api/config' && (method === 'PUT' || method === 'POST')) {
       const patch = await readBody(req);
-      const next = saveConfig(patch);
-      bus.setFilters(() => ({ ...next.overlay.filter, show: next.overlay.show }));
-      tts.configure(next.tts);
+      const next = saveConfig(sanitizePatch(patch));
+      applyLive(next);
       broadcast({ type: 'config', data: next.overlay });
       return sendJson(res, 200, { ok: true, config: next });
     }
 
     if (pathname === '/api/config/reset' && method === 'POST') {
       const next = resetConfig();
-      tts.configure(next.tts);
+      applyLive(next);
       broadcast({ type: 'config', data: next.overlay });
       return sendJson(res, 200, { ok: true, config: next });
     }

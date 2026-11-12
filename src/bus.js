@@ -73,11 +73,12 @@ class Bus extends EventEmitter {
 
   push(event) {
     if (!event) return false;
+
+    // 去重放在过滤之前：重复的帧不该占用「每秒条数 / 用户冷却」的额度
+    if (event.id && this._seen.has(event.id)) return false;
     if (!this._passFilters(event)) return false;
 
-    // 去重：同 id 只上一次
     if (event.id) {
-      if (this._seen.has(event.id)) return false;
       this._seen.add(event.id);
       if (this._seen.size > 2000) {
         // 简单淘汰：清掉最早一半
@@ -120,6 +121,16 @@ class Bus extends EventEmitter {
       const last = this._userLast.get(e.user.id) || 0;
       if (e.ts - last < cooldown) return false;
       this._userLast.set(e.user.id, e.ts);
+      // 长时间直播会积累几万个用户，超过上限就淘汰最早的一批
+      if (this._userLast.size > 5000) {
+        const drop = this._userLast.size - 4000;
+        let i = 0;
+        for (const k of this._userLast.keys()) {
+          if (i >= drop) break;
+          this._userLast.delete(k);
+          i += 1;
+        }
+      }
     }
 
     const rps = Number(f.ratePerSecond) || 0;
@@ -145,6 +156,8 @@ class Bus extends EventEmitter {
     this.stats = { total: 0, byKind: {}, startedAt: Date.now() };
     this.recent = [];
     this._seen.clear();
+    this._userLast.clear();
+    this._secondBucket = { second: 0, count: 0 };
   }
 }
 

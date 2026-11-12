@@ -306,14 +306,45 @@ export async function playLocal(id, buf) {
   await fs.promises.mkdir(dir, { recursive: true });
   const file = path.join(dir, `${id}.mp3`);
   await fs.promises.writeFile(file, buf);
-  await new Promise((resolve) => {
-    const p = spawn('ffplay', ['-nodisp', '-autoexit', '-loglevel', 'quiet', file], {
-      stdio: 'ignore',
-      windowsHide: true,
+  try {
+    await new Promise((resolve, reject) => {
+      let child;
+      try {
+        child = spawn('ffplay', ['-nodisp', '-autoexit', '-loglevel', 'quiet', file], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      let settled = false;
+      const finish = (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (err) reject(err);
+        else resolve();
+      };
+      // 找不到 ffplay / 播放卡死时都要有结论，否则队列会一直停在这
+      const timer = setTimeout(() => {
+        try {
+          child.kill();
+        } catch {
+          /* 忽略 */
+        }
+        finish(new Error('本机播放超时（ffplay 没退出）'));
+      }, 60000);
+      child.on('error', (err) => {
+        finish(
+          err && err.code === 'ENOENT'
+            ? new Error('没找到 ffplay。装个 ffmpeg，或把「播报到」改回「弹幕层页面」')
+            : err,
+        );
+      });
+      child.on('exit', () => finish());
     });
-    const done = () => resolve();
-    p.on('error', done);
-    p.on('exit', done);
-  });
-  fs.promises.unlink(file).catch(() => {});
+  } finally {
+    fs.promises.unlink(file).catch(() => {});
+  }
 }

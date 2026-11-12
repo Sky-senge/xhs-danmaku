@@ -74,7 +74,11 @@ function readControl(el, path) {
     const n = Number(el.value) || 0;
     return `${n >= 0 ? '+' : ''}${n}%`;
   }
-  if (el.type === 'number' || el.type === 'range') return Number(el.value);
+  if (el.type === 'number' || el.type === 'range') {
+    // 输入框被清空时 Number('') 是 0，但 Number('abc') 是 NaN——NaN 存进去会把配置写成 null
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : undefined;
+  }
   if (el.dataset.array) {
     return el.value
       .split(/[\n,，]/)
@@ -133,7 +137,9 @@ function bindControls() {
     if (el._bound) continue;
     el._bound = true;
     el.addEventListener(evt, () => {
-      setPath(state.config, path, readControl(el, path));
+      const value = readControl(el, path);
+      if (value === undefined) return; // 数字框是空的，先不存
+      setPath(state.config, path, value);
       if (el.dataset.range) {
         const out = document.getElementById(el.dataset.range);
         if (out) out.textContent = el.value;
@@ -186,6 +192,8 @@ async function saveConfig() {
       body: JSON.stringify({
         overlay: state.config.overlay,
         source: state.config.source,
+        // tts 也要一起发：以前漏了它，控制台里打开的语音播报根本没存到服务端
+        tts: state.config.tts,
       }),
     });
     markSaved();

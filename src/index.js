@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { loadConfig, saveConfig } from './config.js';
+import { loadConfig, setRuntime } from './config.js';
 import { bus } from './bus.js';
 import { SourceManager } from './sources/index.js';
 import { startServer } from './server.js';
@@ -11,16 +11,21 @@ const value = (name) => {
   return hit ? hit.slice(name.length + 3) : undefined;
 };
 
+// 命令行参数只影响本次运行，不写回 config.json（setRuntime 的覆盖项永不落盘）
+const overrides = {};
+if (flag('mock')) overrides.source = { ...(overrides.source || {}), mode: 'mock' };
+if (flag('headless')) overrides.source = { ...(overrides.source || {}), headless: true };
+
+const port = Number(value('port') || process.env.PORT || 0);
+if (port) overrides.server = { ...(overrides.server || {}), port };
+if (Object.keys(overrides).length) setRuntime(overrides);
+
 const cfg = loadConfig();
 
-// 命令行参数只影响本次运行，不写回 config.json（避免排查问题时污染配置）
-if (flag('mock')) cfg.source.mode = 'mock';
-if (flag('headless')) cfg.source.headless = true;
-
-const port = Number(value('port') || process.env.PORT || cfg.server.port);
-if (port && port !== cfg.server.port) cfg.server.port = port;
-
-bus.setFilters(() => ({ ...cfg.overlay.filter, show: cfg.overlay.show }));
+bus.setFilters(() => {
+  const c = loadConfig();
+  return { ...c.overlay.filter, show: c.overlay.show };
+});
 
 const manager = new SourceManager(bus);
 
